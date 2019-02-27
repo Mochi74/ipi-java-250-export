@@ -1,7 +1,10 @@
 package com.example.demo.controller;
 
 import com.example.demo.entity.Client;
+import com.example.demo.entity.Facture;
+import com.example.demo.entity.LigneFacture;
 import com.example.demo.service.ClientService;
+import com.example.demo.service.FactureService;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +32,9 @@ public class ExportController {
 
     @Autowired
     private ClientService clientService;
+
+    @Autowired
+    private FactureService factureService;
 
 
     @GetMapping("/clients/csv")
@@ -110,12 +116,52 @@ public class ExportController {
         response.setHeader("Content-Disposition", "attachment; filename=\"factures.xlsx\"");
 
         Workbook workbook = new XSSFWorkbook();
-        Sheet sheet = workbook.createSheet("Factures");
+        List<Facture> factures = factureService.findAllFacture();
 
-        Row headerRow = sheet.createRow(0);
+        for (Facture facture:factures)
+            {
+                Sheet sheet = workbook.createSheet("Facture: "+facture.getId().toString());
+                Row headerRow = sheet.createRow(0);
+                Cell cellHeaderId = headerRow.createCell(0);
+                cellHeaderId.setCellValue("début");
 
-        Cell cellHeaderId = headerRow.createCell(0);
-        cellHeaderId.setCellValue("Id");
+                Integer r=5;
+                double total=0;
+
+                for (LigneFacture ligne:facture.getLigneFactures()) {
+                    Row row = sheet.createRow(r++);
+
+                    Cell cell = row.createCell(1);
+                    cell.setCellValue(ligne.getArticle().getLibelle());
+
+                    cell = row.createCell(2);
+                    double qte =ligne.getQuantite();
+                    cell.setCellValue(qte);
+
+                    cell = row.createCell(3);
+                    double pu =ligne.getArticle().getPrix();
+                    cell.setCellValue(pu);
+
+                    cell = row.createCell(4);
+                    pu =ligne.getArticle().getPrix();
+                    cell.setCellValue(pu*qte);
+
+                    total+=pu*qte;
+
+                }
+
+                r++;
+                Row totalRow = sheet.createRow(0);
+                Cell cell = totalRow.createCell(0);
+                cell.setCellValue("Total");
+                cell = totalRow.createCell(1);
+                cell.setCellValue(total);
+
+
+            }
+
+
+
 
         int i = 1;
         //for (Client client : allClients) {
