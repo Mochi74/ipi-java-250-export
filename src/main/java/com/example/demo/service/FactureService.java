@@ -20,4 +20,7 @@ public class FactureService {
     public List<Facture> findAllFacture() {
         return factureRepository.findAll();
     }
+    public List<Facture> findAllFactureByClient(Client id) {
+        return factureRepository.findAllByClient(id);
+    }
 }

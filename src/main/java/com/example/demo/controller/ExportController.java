@@ -5,11 +5,24 @@ import com.example.demo.entity.Facture;
 import com.example.demo.entity.LigneFacture;
 import com.example.demo.service.ClientService;
 import com.example.demo.service.FactureService;
+import com.itextpdf.text.Document;
+import com.itextpdf.text.DocumentException;
+import com.itextpdf.text.Paragraph;
+import com.itextpdf.text.pdf.PdfWriter;
+import org.apache.poi.hssf.usermodel.HSSFCellStyle;
+import org.apache.poi.hssf.usermodel.HSSFFont;
+import org.apache.poi.hssf.usermodel.HSSFSheet;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.ss.usermodel.BorderStyle;
+
+import org.apache.poi.hssf.util.HSSFColor;
 import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.xssf.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import javax.servlet.http.HttpServletRequest;
@@ -63,8 +76,9 @@ public class ExportController {
         List<Client> allClients = clientService.findAllClients();
         LocalDate now = LocalDate.now();
 
-        Workbook workbook = new XSSFWorkbook();
-        Sheet sheet = workbook.createSheet("Clients");
+        XSSFWorkbook workbook = new XSSFWorkbook();
+        XSSFSheet sheet = workbook.createSheet("Clients");
+
 
         Row headerRow = sheet.createRow(0);
 
@@ -115,63 +129,125 @@ public class ExportController {
         response.setContentType("application/vnd.ms-excel");
         response.setHeader("Content-Disposition", "attachment; filename=\"factures.xlsx\"");
 
-        Workbook workbook = new XSSFWorkbook();
-        List<Facture> factures = factureService.findAllFacture();
+        XSSFWorkbook workbook = new XSSFWorkbook();
+        List<Client> allClients = clientService.findAllClients();
 
-        for (Facture facture:factures)
-            {
-                Sheet sheet = workbook.createSheet("Facture: "+facture.getId().toString());
-                Row headerRow = sheet.createRow(0);
-                Cell cellHeaderId = headerRow.createCell(0);
-                cellHeaderId.setCellValue("début");
+      for (Client client: allClients) {
+          XSSFSheet clientSheet = workbook.createSheet("Client " + client.getNom().toString());
 
-                Integer r=5;
-                double total=0;
+          List<Facture> factures = factureService.findAllFactureByClient(client);
 
-                for (LigneFacture ligne:facture.getLigneFactures()) {
-                    Row row = sheet.createRow(r++);
+          Row clientRow = clientSheet.createRow(3);
+          Cell cellClientId = clientRow.createCell(1);
+          cellClientId.setCellValue("Facture pour :");
+          cellClientId = clientRow.createCell(3);
+          cellClientId.setCellValue(client.getPrenom() + " " + client.getNom());
 
-                    Cell cell = row.createCell(1);
-                    cell.setCellValue(ligne.getArticle().getLibelle());
+          //Create a new font and alter it.
+          XSSFFont font = workbook.createFont();
+          font.setBold(true);
+          font.setColor(HSSFColor.HSSFColorPredefined.RED.getIndex());
 
-                    cell = row.createCell(2);
-                    double qte =ligne.getQuantite();
-                    cell.setCellValue(qte);
-
-                    cell = row.createCell(3);
-                    double pu =ligne.getArticle().getPrix();
-                    cell.setCellValue(pu);
-
-                    cell = row.createCell(4);
-                    pu =ligne.getArticle().getPrix();
-                    cell.setCellValue(pu*qte);
-
-                    total+=pu*qte;
-
-                }
-
-                r++;
-                Row totalRow = sheet.createRow(0);
-                Cell cell = totalRow.createCell(0);
-                cell.setCellValue("Total");
-                cell = totalRow.createCell(1);
-                cell.setCellValue(total);
+          //Set font into style
+          XSSFCellStyle styleBold = workbook.createCellStyle();
+          styleBold.setFont(font);
+          styleBold.setBorderBottom(BorderStyle.THICK);
+          styleBold.setBorderTop(BorderStyle.THICK);
+          styleBold.setBorderRight(BorderStyle.THICK);
+          styleBold.setBorderLeft(BorderStyle.THICK);
 
 
-            }
+          for (Facture facture : factures) {
 
+              XSSFSheet sheet = workbook.createSheet("Facture " + facture.getId().toString());
+              Integer r = 3;
 
+              // edit client
+              // add an empty line
+              r++;
+              // build entete
+              Row headerRow = sheet.createRow(r++);
+              Cell cellHeaderId = headerRow.createCell(1);
+              cellHeaderId.setCellValue("Libelle");
+              cellHeaderId = headerRow.createCell(2);
+              cellHeaderId.setCellValue("Quantité");
+              cellHeaderId = headerRow.createCell(3);
+              cellHeaderId.setCellValue("Prix Unitaire");
+              cellHeaderId = headerRow.createCell(4);
+              cellHeaderId.setCellValue("Prix");
 
+              //build facture lines
+              double total = 0;
 
-        int i = 1;
-        //for (Client client : allClients) {
-        //   Row row = sheet.createRow(i);
+              for (LigneFacture ligne : facture.getLigneFactures()) {
+                  Row row = sheet.createRow(r++);
 
-        // i++;
-        //}
+                  Cell cell = row.createCell(1);
+                  cell.setCellValue(ligne.getArticle().getLibelle());
 
+                  cell = row.createCell(2);
+                  double qte = ligne.getQuantite();
+                  cell.setCellValue(qte);
+
+                  cell = row.createCell(3);
+                  double pu = ligne.getArticle().getPrix();
+                  cell.setCellValue(pu);
+
+                  cell = row.createCell(4);
+                  pu = ligne.getArticle().getPrix();
+                  cell.setCellValue(pu * qte);
+
+                  total += pu * qte;
+
+              }
+
+              r++;
+              //add total
+              Row totalRow = sheet.createRow(r);
+              sheet.addMergedRegion(new CellRangeAddress(r, r, 1, 3));
+              Cell cell = totalRow.createCell(1);
+              cell.setCellValue("Total");
+              cell = totalRow.createCell(4);
+              cell.setCellValue(total);
+              cell.setCellStyle(styleBold);
+          }
+      }
         workbook.write(response.getOutputStream());
         workbook.close();
 
     }
+
+
+
+    @GetMapping("/factures/{id}/pdf")
+    public void facturesPdf(HttpServletRequest request, HttpServletResponse response,@PathVariable String id) throws DocumentException, IOException {
+        response.setContentType("application/pdf");
+        response.setHeader("Content-Disposition", "attachment; filename=\"factures"+id+".pdf\"");
+
+        Document document = new Document();
+        PdfWriter.getInstance(document, response.getOutputStream());
+        document.open();
+        document.add(new Paragraph("Hello World! "+id));
+
+
+        List<Facture> factures = factureService.findAllFacture();
+
+        for (Facture facture:factures) {
+            document.add(new Paragraph(facture.getClient().getPrenom() + " " + facture.getClient().getNom()));
+            double qte;
+            double pu;
+            double total=0;
+            document.add(new Paragraph("Libellé Quantité Prix Unitaire Prix"));
+            for (LigneFacture ligne:facture.getLigneFactures()) {
+                ligne.getArticle().getLibelle();
+                qte =ligne.getQuantite();
+                pu =ligne.getArticle().getPrix();
+                document.add(new Paragraph(ligne.getArticle().getLibelle()+ qte + pu + qte*pu));
+                total+=pu*qte;
+            }
+
+        }
+        document.close();
+    }
 }
+
